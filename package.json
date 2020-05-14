@@ -22,11 +22,11 @@
   },
   "homepage": "https://github.com/marudor/node-cache-manager-hazelcast#readme",
   "dependencies": {
-    "hazelcast-client": "^0.3.0"
+    "hazelcast-client": "^3.12.3"
   },
   "devDependencies": {
     "babel-cli": "^6.9.0",
-    "babel-plugin-add-module-exports": "^0.2.1",
+    "babel-plugin-add-module-exports": "^1.0.2",
     "babel-plugin-transform-es2015-modules-commonjs": "^6.8.0",
     "babel-plugin-transform-flow-strip-types": "^6.8.0",
     "babel-preset-stage-1": "^6.5.0"

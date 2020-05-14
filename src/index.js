@@ -1,10 +1,10 @@
 // @flow
-import { Address, Config, Client } from 'hazelcast-client';
-import type { IMap } from 'hazelcast-client';
+import { Address, Config, Client } from "hazelcast-client";
+import type { IMap } from "hazelcast-client";
 
 export type HazelcastGetOptions = {
   mapName?: string,
-}
+};
 
 export type HazelcastSetOptions = {
   ttl?: number,
@@ -19,8 +19,8 @@ type storeConfig = {
 };
 
 class HazelcastStore {
-  name: string = 'hazelcast';
-  usePromises: bool = true;
+  name: string = "hazelcast";
+  usePromises: boolean = true;
   defaultMap: string;
   client: Client;
   prefix: ?string;
@@ -30,85 +30,96 @@ class HazelcastStore {
     this.args = args;
     this.createClient(args);
     this.prefix = args.prefix;
-    this.defaultMap = args.defaultMap || 'CACHE';
+    this.defaultMap = args.defaultMap || "CACHE";
   }
   createClient(args: storeConfig) {
-    const cfg = new Config.ClientConfig();
+    const clientConfig = new Config.ClientConfig();
     const networkCfg = new Config.ClientNetworkConfig();
-    networkCfg.addresses = [new Address(args.host, args.port ? Number.parseInt(args.port, 10) : undefined)];
-    cfg.networkConfig = networkCfg;
-    cfg.properties['hazelcast.logging'] = 'off';
-    return Client.newHazelcastClient(cfg).then(client => {
+    const address = `${args.host}:${Number.parseInt(args.port, 10)}`;
+    // Customize the client configuration
+    clientConfig.groupConfig.name = "cluster";
+    clientConfig.networkConfig.addresses.push(address);
+
+    clientConfig.properties["hazelcast.logging"] = "off";
+    return Client.newHazelcastClient(clientConfig).then((client) => {
       this.client = client;
     });
   }
   mapName(map?: string) {
-    return `${this.prefix ? `${this.prefix}_` : ''}${map || this.defaultMap}`;
+    return `${this.prefix ? `${this.prefix}_` : ""}${map || this.defaultMap}`;
   }
   map(map?: string): IMap<string, mixed> {
     return this.client.getMap(this.mapName(map));
   }
   _tryCatchRestart(fn: Function): Promise {
-    return fn()
-    .catch(e => {
-      if (e.code === 'EPIPE') {
-        return this.createClient(this.args)
-        .then(() => fn());
+    return fn().catch((e) => {
+      if (e.code === "EPIPE") {
+        return this.createClient(this.args).then(() => fn());
       }
     });
   }
   setPromise(key: string, value: mixed, options: HazelcastSetOptions = {}) {
-    return this._tryCatchRestart(() => this.map(options.mapName).put(key, value, options.ttl));
+    return this._tryCatchRestart(() =>
+      this.map(options.mapName).put(key, value, options.ttl)
+    );
   }
-  set(key: string, value: mixed, options: HazelcastSetOptions = {}, cb: Function) {
+  set(
+    key: string,
+    value: mixed,
+    options: HazelcastSetOptions = {},
+    cb: Function
+  ) {
     options.ttl = options.ttl || this.args.ttl;
     this.setPromise(key, value, options)
-    .then(val => cb(undefined, val))
-    .catch(err => cb(err));
+      .then((val) => cb(undefined, val))
+      .catch((err) => cb(err));
   }
   getPromise(key: string, options: HazelcastGetOptions = {}) {
-    return this._tryCatchRestart(() => this.map(options.mapName).get(key)
-    .then(raw => {
-      try {
-        return JSON.parse((raw: any));
-      } catch (e) {
-        return raw;
-      }
-    }));
+    return this._tryCatchRestart(() =>
+      this.map(options.mapName)
+        .get(key)
+        .then((raw) => {
+          try {
+            return JSON.parse((raw: any));
+          } catch (e) {
+            return raw;
+          }
+        })
+    );
   }
   get(key: string, options: HazelcastGetOptions = {}, cb: Function) {
     this.getPromise(key, options)
-    .then(val => cb(undefined, val))
-    .catch(err => cb(err));
+      .then((val) => cb(undefined, val))
+      .catch((err) => cb(err));
   }
   delPromise(key: string, options?: HazelcastGetOptions = {}) {
     return this._tryCatchRestart(() => this.map(options.mapName).delete(key));
   }
   del(key: string, options: HazelcastGetOptions = {}, cb: Function) {
     this.delPromise(key, options)
-    .then(val => cb(undefined, val))
-    .catch(err => cb(err));
+      .then((val) => cb(undefined, val))
+      .catch((err) => cb(err));
   }
   resetPromise(options?: HazelcastGetOptions = {}) {
     return this._tryCatchRestart(() => this.map(options.mapName).clear());
   }
   reset(options: HazelcastGetOptions = {}, cb: Function) {
     this.resetPromise(options)
-    .then(val => cb(undefined, val))
-    .catch(err => cb(err));
+      .then((val) => cb(undefined, val))
+      .catch((err) => cb(err));
   }
   keysPromise(options?: HazelcastGetOptions = {}) {
     return this._tryCatchRestart(() => this.map(options.mapName).keySet());
   }
   keys(options: HazelcastGetOptions = {}, cb: Function) {
     this.keysPromise(options)
-    .then(val => cb(undefined, val))
-    .catch(err => cb(err));
+      .then((val) => cb(undefined, val))
+      .catch((err) => cb(err));
   }
 }
 
 export default {
   create(args: any) {
     return new HazelcastStore(args);
-  }
+  },
 };
